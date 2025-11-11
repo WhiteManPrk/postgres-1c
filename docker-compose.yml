@@ -1,0 +1,27 @@
+services:
+  pg1c:
+    image: whitemanprk/postgres-1c:16
+    container_name: pg1c
+    restart: unless-stopped
+    stop_grace_period: 60s
+    ports:
+      - "${PG_PORT:-5432}:5432"
+    environment:
+      #POSTGRES_USER: "${POSTGRES_USER:-postgres}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-secret}"
+      #POSTGRES_DB: "${POSTGRES_DB:-postgres}"
+      #LANG: "${LANG:-ru_RU.UTF-8}"
+      #LC_ALL: "${LC_ALL:-ru_RU.UTF-8}"
+      #TZ: "${TZ:-Asia/Tomsk}"
+      POSTGRES_INITDB_ARGS: "${POSTGRES_INITDB_ARGS:---encoding=UTF8 --locale=ru_RU.UTF-8}"
+      #DB_USER: "${DB_USER:-app}"
+      #DB_PASS: "${DB_PASS:-appPass123}"
+      #DB_NAME: "${DB_NAME:-appdb}"
+    volumes:
+      - pg1c-data:/var/lib/postgresql/data
+      #- ./pg1c-data:/var/lib/postgresql/data
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+
+volumes:
+ pg1c-data:
+   driver: local

@@ -1,0 +1,5 @@
+distr/17
+pg1c-data/
+
+*.deb
+.env

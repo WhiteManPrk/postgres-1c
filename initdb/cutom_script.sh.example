@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# === НАСТРОЙКИ (РЕДАКТИРУЙТЕ ЗДЕСЬ) ===
+
+# Сетевые настройки
+PG_LISTEN_ADDRESSES="*"
+PG_ALLOWED_HOSTS="172.20.0.1/32,10.0.10.0/24"
+PG_HBA_METHOD="scram-sha-256"
+
+# Дополнительные пользователи (оставьте пустыми, если не нужны)
+DB_USER1_NAME="User1"
+DB_USER1_PASS="123"
+
+DB_USER2_NAME=""  
+DB_USER2_PASS=""
+
+# ========================================
+
+echo "=== PostgreSQL 1C Init Script Started ==="
+
+# 1) Настройка listen_addresses
+if [ -n "${PG_LISTEN_ADDRESSES}" ]; then
+  echo "Setting listen_addresses = '${PG_LISTEN_ADDRESSES}'"
+  echo "listen_addresses = '${PG_LISTEN_ADDRESSES}'" >> "$PGDATA/postgresql.conf"
+else
+  echo "Skip listen_addresses (empty value)."
+fi
+
+# 2) Правила доступа в pg_hba.conf
+if [ -n "${PG_ALLOWED_HOSTS}" ] && [ -n "${PG_HBA_METHOD}" ]; then
+  echo "Adding pg_hba.conf rules for hosts: ${PG_ALLOWED_HOSTS}"
+  IFS=',' read -ra HOSTS_ARR <<< "$PG_ALLOWED_HOSTS"
+  {
+    echo ""
+    echo "# Network access rules from init script"
+    for h in "${HOSTS_ARR[@]}"; do
+      h="$(echo "$h" | xargs)"
+      [ -z "$h" ] && continue
+      # Если IP без маски — добавляем /32
+      [[ "$h" != */* ]] && h="${h}/32"
+      echo "host all all ${h} ${PG_HBA_METHOD}"
+    done
+  } >> "$PGDATA/pg_hba.conf"
+else
+  echo "Skip pg_hba.conf rules (empty hosts or method)."
+fi
+
+# 3) Первый дополнительный пользователь
+if [ -n "${DB_USER1_NAME}" ] && [ -n "${DB_USER1_PASS}" ]; then
+  echo "Creating/updating role: ${DB_USER1_NAME}"
+  psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
+    DO \$\$
+    BEGIN
+      IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '${DB_USER1_NAME}') THEN
+        CREATE ROLE "${DB_USER1_NAME}" LOGIN PASSWORD '${DB_USER1_PASS}' CREATEDB CREATEROLE;
+        RAISE NOTICE 'Created role: ${DB_USER1_NAME}';
+      ELSE
+        ALTER ROLE "${DB_USER1_NAME}" WITH LOGIN PASSWORD '${DB_USER1_PASS}' CREATEDB CREATEROLE;
+        RAISE NOTICE 'Updated role: ${DB_USER1_NAME}';
+      END IF;
+    END
+    \$\$;
+EOSQL
+else
+  echo "Skip first additional user (empty name or password)."
+fi
+
+# 4) Второй дополнительный пользователь
+if [ -n "${DB_USER2_NAME}" ] && [ -n "${DB_USER2_PASS}" ]; then
+  echo "Creating/updating role: ${DB_USER2_NAME}"
+  psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
+    DO \$\$
+    BEGIN
+      IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '${DB_USER2_NAME}') THEN
+        CREATE ROLE "${DB_USER2_NAME}" LOGIN PASSWORD '${DB_USER2_PASS}' CREATEDB CREATEROLE;
+        RAISE NOTICE 'Created role: ${DB_USER2_NAME}';
+      ELSE
+        ALTER ROLE "${DB_USER2_NAME}" WITH LOGIN PASSWORD '${DB_USER2_PASS}' CREATEDB CREATEROLE;
+        RAISE NOTICE 'Updated role: ${DB_USER2_NAME}';
+      END IF;
+    END
+    \$\$;
+EOSQL
+else
+  echo "Skip second additional user (empty name or password)."
+fi
+
+echo "=== Init script finished successfully ==="
