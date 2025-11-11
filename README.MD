@@ -4,7 +4,7 @@
 
 [![Docker Pulls](https://img.shields.io/docker/pulls/whitemanprk/postgres-1c)](https://hub.docker.com/r/whitemanprk/postgres-1c)
 [![Docker Image Size](https://img.shields.io/docker/image-size/whitemanprk/postgres-1c/latest)](https://hub.docker.com/r/whitemanprk/postgres-1c)
-[![PostgreSQL Version](https://img.shields.io/badge/PostgreSQL-17.5--11.1C-blue)](https://www.postgresql.org/)
+[![PostgreSQL Version](https://img.shields.io/badge/PostgreSQL-17.5--11--1C-blue)](https://www.postgresql.org/)
 [![1C Compatible](https://img.shields.io/badge/1C-Enterprise-green)](https://1c.ru/)
 
 **Контейнерный Docker-образ PostgreSQL для 1С:Предприятие с автоматизацией сборки из официальных deb‑пакетов и поддержкой оптимизированных сценариев деплоя.**
