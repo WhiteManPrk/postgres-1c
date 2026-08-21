@@ -29,7 +29,10 @@ RUN set -eux; \
         libldap-2.5-0 \
         libcurl4 \
         libxml2 \
-        libedit2; \
+        libedit2 \
+        libnuma1 \
+        liburing2 \
+        libllvm19; \
     echo "ru_RU.UTF-8 UTF-8" > /etc/locale.gen; \
     echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen; \
     locale-gen; \
