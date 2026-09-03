@@ -1,6 +1,6 @@
 services:
   pg1c:
-    image: whitemanprk/postgres-1c:16
+    image: whitemanprk/postgres-1c:18
     container_name: pg1c
     restart: unless-stopped
     stop_grace_period: 60s
@@ -18,7 +18,9 @@ services:
       #DB_PASS: "${DB_PASS:-appPass123}"
       #DB_NAME: "${DB_NAME:-appdb}"
     volumes:
-      - pg1c-data:/var/lib/postgresql/data
+      #- pg1c-data:/var/lib/postgresql/data
+      # для 18 версии
+      - pg1c-data:/var/lib/postgresql/18/data
       #- ./pg1c-data:/var/lib/postgresql/data
       - ./initdb:/docker-entrypoint-initdb.d:ro
 
