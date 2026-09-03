@@ -11,13 +11,16 @@ PG_HBA_METHOD="scram-sha-256"
 # Дополнительные пользователи (оставьте пустыми, если не нужны)
 DB_USER1_NAME="User1"
 DB_USER1_PASS="123"
+# Права для первого пользователя. Для 1С нужен SUPERUSER
+DB_USER1_ATTRS="SUPERUSER" 
 
 DB_USER2_NAME=""  
 DB_USER2_PASS=""
+DB_USER2_ATTRS="CREATEDB CREATEROLE" 
 
 # ========================================
 
-echo "=== PostgreSQL 1C Init Script Started ==="
+echo "=== PostgreSQL Init Script Started ==="
 
 # 1) Настройка listen_addresses
 if [ -n "${PG_LISTEN_ADDRESSES}" ]; then
@@ -48,15 +51,15 @@ fi
 
 # 3) Первый дополнительный пользователь
 if [ -n "${DB_USER1_NAME}" ] && [ -n "${DB_USER1_PASS}" ]; then
-  echo "Creating/updating role: ${DB_USER1_NAME}"
+  echo "Creating/updating role: ${DB_USER1_NAME} with attributes: ${DB_USER1_ATTRS}"
   psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
     DO \$\$
     BEGIN
       IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '${DB_USER1_NAME}') THEN
-        CREATE ROLE "${DB_USER1_NAME}" LOGIN PASSWORD '${DB_USER1_PASS}' CREATEDB CREATEROLE;
+        CREATE ROLE "${DB_USER1_NAME}" LOGIN PASSWORD '${DB_USER1_PASS}' ${DB_USER1_ATTRS};
         RAISE NOTICE 'Created role: ${DB_USER1_NAME}';
       ELSE
-        ALTER ROLE "${DB_USER1_NAME}" WITH LOGIN PASSWORD '${DB_USER1_PASS}' CREATEDB CREATEROLE;
+        ALTER ROLE "${DB_USER1_NAME}" WITH LOGIN PASSWORD '${DB_USER1_PASS}' ${DB_USER1_ATTRS};
         RAISE NOTICE 'Updated role: ${DB_USER1_NAME}';
       END IF;
     END
@@ -68,15 +71,15 @@ fi
 
 # 4) Второй дополнительный пользователь
 if [ -n "${DB_USER2_NAME}" ] && [ -n "${DB_USER2_PASS}" ]; then
-  echo "Creating/updating role: ${DB_USER2_NAME}"
+  echo "Creating/updating role: ${DB_USER2_NAME} with attributes: ${DB_USER2_ATTRS}"
   psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
     DO \$\$
     BEGIN
       IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '${DB_USER2_NAME}') THEN
-        CREATE ROLE "${DB_USER2_NAME}" LOGIN PASSWORD '${DB_USER2_PASS}' CREATEDB CREATEROLE;
+        CREATE ROLE "${DB_USER2_NAME}" LOGIN PASSWORD '${DB_USER2_PASS}' ${DB_USER2_ATTRS};
         RAISE NOTICE 'Created role: ${DB_USER2_NAME}';
       ELSE
-        ALTER ROLE "${DB_USER2_NAME}" WITH LOGIN PASSWORD '${DB_USER2_PASS}' CREATEDB CREATEROLE;
+        ALTER ROLE "${DB_USER2_NAME}" WITH LOGIN PASSWORD '${DB_USER2_PASS}' ${DB_USER2_ATTRS};
         RAISE NOTICE 'Updated role: ${DB_USER2_NAME}';
       END IF;
     END
