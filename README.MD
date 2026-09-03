@@ -72,7 +72,8 @@ services:
       #DB_NAME: "${DB_NAME:-appdb}"
     volumes:
       - pg1c-data:/var/lib/postgresql/data
-      #- ./pg1c-data:/var/lib/postgresql/data
+      # для 18 версии
+      #- pg1c-data:/var/lib/postgresql/18/data
       - ./initdb:/docker-entrypoint-initdb.d:ro
 
 volumes:
