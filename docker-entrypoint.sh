@@ -103,24 +103,6 @@ docker_init_database_dir() {
 # print large warning if POSTGRES_HOST_AUTH_METHOD is set to 'trust'
 # assumes database is not set up, ie: [ -z "$DATABASE_ALREADY_EXISTS" ]
 docker_verify_minimum_env() {
-	case "${PG_MAJOR:-}" in
-		13) # https://github.com/postgres/postgres/commit/67a472d71c98c3d2fa322a1b4013080b20720b98
-			# check password first so we can output the warning before postgres
-			# messes it up
-			if [ "${#POSTGRES_PASSWORD}" -ge 100 ]; then
-				cat >&2 <<-'EOWARN'
-
-					WARNING: The supplied POSTGRES_PASSWORD is 100+ characters.
-
-					  This will not work if used via PGPASSWORD with "psql".
-
-					  https://www.postgresql.org/message-id/flat/E1Rqxp2-0004Qt-PL%40wrigleys.postgresql.org (BUG #6412)
-					  https://github.com/docker-library/postgres/issues/507
-
-				EOWARN
-			fi
-			;;
-	esac
 	if [ -z "$POSTGRES_PASSWORD" ] && [ 'trust' != "$POSTGRES_HOST_AUTH_METHOD" ]; then
 		# The - option suppresses leading tabs but *not* spaces. :)
 		cat >&2 <<-'EOE'
@@ -245,8 +227,6 @@ docker_setup_db() {
 		EOSQL
 		printf '\n'
 	fi
-    
-
 }
 
 # Loads various settings that are used elsewhere in the script
@@ -272,7 +252,12 @@ docker_setup_env() {
 				OLD_DATABASES+=( "$d" )
 			fi
 		done
-		if [ "${#OLD_DATABASES[@]}" -eq 0 ] && [ "$PG_MAJOR" -ge 18 ] && mountpoint -q /var/lib/postgresql/data; then
+		if [ "${#OLD_DATABASES[@]}" -eq 0 ] && [ "$PG_MAJOR" -ge 18 ] && {
+			# in BusyBox, "mountpoint" only checks dev vs ino (https://github.com/tianon/mirror-busybox/blob/be7d1b7b1701d225379bc1665487ed0871b592a5/util-linux/mountpoint.c#L78) which will notably miss bind mounts entirely (which almost all Docker volume mounts are)
+			# coreutils checks /proc/self/mountinfo, so we have a fallback to mimic that and directly check "/proc/self/mountinfo" to catch that case
+			mountpoint -q /var/lib/postgresql/data \
+			|| awk '$5 == "/var/lib/postgresql/data" { found = 1 } END { exit !found }' /proc/self/mountinfo
+		}; then
 			OLD_DATABASES+=( '/var/lib/postgresql/data (unused mount/volume)' )
 		fi
 	fi
@@ -375,42 +360,43 @@ _main() {
 			docker_temp_server_start "$@"
 
 			docker_setup_db
-# === Custom block: Create additional application user and databases ===
-if [ -n "${DB_USER:-}" ] && [ -n "${DB_PASS:-}" ]; then
-  echo "Creating additional role '${DB_USER}'"
-  docker_process_sql --dbname postgres <<-EOSQL
-    DO \$\$
-    BEGIN
-      IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '${DB_USER}') THEN
-        CREATE ROLE "${DB_USER}" LOGIN PASSWORD '${DB_PASS}';
-      END IF;
-    END
-    \$\$;
-EOSQL
-fi
 
-if [ -n "${DB_NAME:-}" ] && [ -n "${DB_USER:-}" ]; then
-  IFS=',' read -ra _DBS <<< "${DB_NAME}"
-  for _db in "${_DBS[@]}"; do
-    _db="$(echo "${_db}" | xargs)"
-    [ -z "$_db" ] && continue
-    echo "Ensuring database '${_db}' with owner '${DB_USER}'"
-    exists="$(docker_process_sql --dbname postgres --tuples-only --no-align <<-EOSQL
-      SELECT 1 FROM pg_database WHERE datname = '${_db}';
-EOSQL
-)"
-    if [ -z "$exists" ]; then
-      docker_process_sql --dbname postgres <<-EOSQL
-        CREATE DATABASE "${_db}" OWNER "${DB_USER}";
-EOSQL
-    fi
-    docker_process_sql --dbname "${_db}" <<-EOSQL
-      ALTER DATABASE "${_db}" OWNER TO "${DB_USER}";
-      GRANT ALL PRIVILEGES ON SCHEMA public TO "${DB_USER}";
-EOSQL
-  done
-fi
-# === End custom block ===
+# === Custom block: Create additional application user and databases ===
+			if [ -n "${DB_USER:-}" ] && [ -n "${DB_PASS:-}" ]; then
+			  echo "Creating additional role '${DB_USER}'"
+			  docker_process_sql --dbname postgres <<-EOSQL
+			    DO \$\$
+			    BEGIN
+			      IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '${DB_USER}') THEN
+			        CREATE ROLE "${DB_USER}" LOGIN PASSWORD '${DB_PASS}';
+			      END IF;
+			    END
+			    \$\$;
+			EOSQL
+			fi
+
+			if [ -n "${DB_NAME:-}" ] && [ -n "${DB_USER:-}" ]; then
+			  IFS=',' read -ra _DBS <<< "${DB_NAME}"
+			  for _db in "${_DBS[@]}"; do
+			    _db="$(echo "${_db}" | xargs)"
+			    [ -z "$_db" ] && continue
+			    echo "Ensuring database '${_db}' with owner '${DB_USER}'"
+			    exists="$(docker_process_sql --dbname postgres --tuples-only --no-align <<-EOSQL
+			      SELECT 1 FROM pg_database WHERE datname = '${_db}';
+			EOSQL
+			)"
+			    if [ -z "$exists" ]; then
+			      docker_process_sql --dbname postgres <<-EOSQL
+			        CREATE DATABASE "${_db}" OWNER "${DB_USER}";
+			EOSQL
+			    fi
+			    docker_process_sql --dbname "${_db}" <<-EOSQL
+			      ALTER DATABASE "${_db}" OWNER TO "${DB_USER}";
+			      GRANT ALL PRIVILEGES ON SCHEMA public TO "${DB_USER}";
+			EOSQL
+			  done
+			fi
+			# === End custom block ===
 
 			docker_process_init_files /docker-entrypoint-initdb.d/*
 
@@ -429,6 +415,8 @@ fi
 
 			EOM
 		fi
+
+		unset "${!POSTGRES_@}"
 	fi
 
 	exec "$@"
