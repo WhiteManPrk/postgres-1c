@@ -53,7 +53,11 @@ docker build -t postgres-1c:16 --build-arg PG_MAJOR=16 .
 ```yaml
 services:
   pg1c:
-    image: whitemanprk/postgres-1c:16
+    build:
+      context: .                 # Указывает на текущую директорию, где лежат Dockerfile и папка distr/
+      args:
+        PG_MAJOR: 18             # Версия(изменить под необходимую)
+    image: local/postgres-1c:18  # Имя, которое получит собранный образ 
     container_name: pg1c
     restart: unless-stopped
     stop_grace_period: 60s
